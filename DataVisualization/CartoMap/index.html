@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SPANISH FOUNDATIONS</title>
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"/>
+    <link rel="shortcut icon" href="https://cartodb.com/assets/favicon.ico" />
+
+    <!-- leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.2.0/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.2.0/dist/leaflet.js"></script>
+	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+
+    <!-- underscore -->
+    <script src="https://fastcdn.org/Underscore.js/1.8.3/underscore-min.js"></script>
+
+    <!-- jquery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://unpkg.com/popper.js/dist/umd/popper.min.js"></script>
+	
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js" integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl" crossorigin="anonymous"></script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/js/bootstrap-multiselect.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-multiselect/0.9.13/css/bootstrap-multiselect.css" type="text/css"/>
+
+    <!-- carto.js -->
+    <script src="http://cartodb-libs.global.ssl.fastly.net/carto.js/v4.0.0-beta.10/carto.min.js"></script>
+
+	<!-- selec2 -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/css/select2.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.0.3/js/select2.min.js"></script>
+
+	
+	<script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+	
+	<link href="style.css" rel="stylesheet"></style>
+		<!-- chartjs -->
+    <script src="http://www.chartjs.org/dist/2.7.1/Chart.bundle.js"></script>
+    <script src="http://www.chartjs.org/samples/latest/utils.js"></script>
+	
+		<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" rel="stylesheet">
+
+		
+
+</head>
+<body>
+	<div id="leftSidebarClosed">
+	
+	</div>
+	<div id="leftSidebar">
+	<button id="sidebarButtonOpen" class="hamburger"><i class="fa fa-bar-chart fa-2x" aria-hidden="true"></i></button><br><br><br>
+	<center>
+	Choose a graphic to plot it on the map<br><br><br>
+	
+	
+	</center>
+	</div>
+    <!-- map div -->
+    <div id="map" class="sidebar-map"></div>
+
+	
+	<!-- histogram div -->
+    <div id="histogram" style="height: 400px">
+        <h1 id="articlesPerJournalChartTitle"><center>DISTRIBUTION OF ARTICLES PER JOURNAL</center></h1>
+        <canvas id="articlesPerJournalChart" width="100" height="100"></canvas>
+		<h1 id="articlesPerYearChartTitle"><center>DISTRIBUTION OF ARTICLES PER YEAR</center></h1>
+		<canvas id="articlesPerYearChart" width="100" height="100"></canvas>
+    </div>
+	
+	<div id="controls">
+      <div id="content">
+      </div>
+    </div>
+	
+	<!-- infowindow div -->
+    <script type="infowindow/html" id="infowindow_template">
+      <div class="cartodb-popup v2">
+        <a href="#close" class="cartodb-popup-close-button close">x</a>
+        <div class="cartodb-popup-content-wrapper">
+          <div class="cartodb-popup-content">
+            <h3><b>NOMBRE FUNDACIÓN:</b> {{nombre}}</h3>
+			
+        </div>
+        <div class="cartodb-popup-tip-container"></div>
+      </div>
+    </script>
+	
+    <div id="wraper-field-selector">
+      
+    </div>
+
+    
+
+    <script type="text/cartocss" id="style">
+      #layer {
+        marker-fill-opacity: 1;
+  marker-line-width: 1;
+  marker-line-color: #FFFFFF;
+  marker-line-opacity: 1;
+  marker-width: 10;
+    marker-fill: #1a9641;
+    marker-allow-overlap: false;
+  
+  
+		
+      }
+      
+    </script>
+
+    <script type="text/sql" id="query">
+      SELECT 
+        DISTINCT(A.nombre),A.provincia,A.fecha_inscripcion,A.domicilio,A.localidad,A.codigo_postal,A.cartodb_id, A.the_geom_webmercator
+      FROM 
+        foundations_v1 A
+    </script>
+
+    <script>
+	function main() {
+	let selectedYearsArray = "";
+	let selectedJournalsArray = "";
+	
+	
+      
+        // get styles, query, legend & slider
+        const style = $("#style").text();
+        const query = _.template($('#query').html());
+        const slider_container = $('#slider-container');
+        const slider = $('#slider-cities');
+
+        console.log(query)
+		console.log('cargando')
+		
+
+        // add map variable
+        map = L.map('map', { 
+            zoomControl: false,
+            center: [40.41, -3.70],
+            zoom: 4,
+			minZoom: 2,
+            maxZoom: 18
+        });
+
+        // add Voyager Basemap
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          zIndex: 0
+        }).addTo(map);
+		
+
+		
+		// Adding Voyager Labels
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}.png', {
+                maxZoom: 18,
+				zIndex: 0
+            }).addTo(map);
+			
+		L.control.zoom({ position: 'bottomleft' }).addTo(map);
+        // add client
+        const client = new carto.Client({
+          apiKey: '9d3d3e19781c35ce76c075e4cfe9d5caa1604ce9',
+          username: 'carto-bsc'
+        });
+
+        // define layer configuration
+        let citiesSource = new carto.source.SQL(query({cities:500, year: selectedYearsArray, journal: selectedJournalsArray})),
+              citiesStyle = new carto.style.CartoCSS(style),
+              citiesLayer = new carto.layer.Layer(citiesSource, citiesStyle, {
+        featureOverColumns: ['nombre','provincia','localidad','domicilio','codigo_postal','fecha_inscripcion']});
+		
+		
+
+
+        // add layer to Leaflet map
+        client.addLayer(citiesLayer);
+        client.getLeafletLayer().addTo(map)
+		 
+	    $(document).ready(function() {
+		// Hide everything
+		//$('#sidebarButtonClosed').hide();
+		$('#leftSidebar').hide();
+		
+		$('#histogram').hide();
+		$('#articlesPerJournalChartTitle').hide();
+		$('#articlesPerJournalChart').hide();
+		$('#articlesPerYearChartTitle').hide();
+		$('#articlesPerYearChart').hide();
+		
+		$( "#sidebarButtonOpen" ).click(function() {
+			$('#sidebarButtonClosed').show();
+			$('#leftSidebar').fadeOut();
+		});
+		$( "#sidebarButtonClosed" ).click(function() {
+			$('#sidebarButtonClosed').hide();
+			$('#leftSidebar').fadeIn();
+		});
+		
+		$( "#plotArticlesPerJournal" ).click(function() {
+			if ( $('#articlesPerJournalChart').css('display') == 'none' ){
+				$('#articlesPerYearChartTitle').hide();
+				$('#articlesPerYearChart').hide();
+				$('#histogram').fadeIn();
+				$('#articlesPerJournalChartTitle').fadeIn();
+				$('#articlesPerJournalChart').fadeIn();
+			} else {
+				$('#histogram').fadeOut();
+				$('#articlesPerJournalChartTitle').fadeOut();
+				$('#articlesPerJournalChart').fadeOut();
+			}
+		});
+		
+		$( "#plotArticlesPerYear" ).click(function() {
+			if ( $('#articlesPerYearChart').css('display') == 'none' ){
+				$('#articlesPerJournalChartTitle').hide();
+				$('#articlesPerJournalChart').hide();
+				$('#histogram').fadeIn();
+				$('#articlesPerYearChartTitle').fadeIn();
+				$('#articlesPerYearChart').fadeIn();
+			} else {
+				$('#histogram').fadeOut();
+				$('#articlesPerYearChartTitle').fadeOut();
+				$('#articlesPerYearChart').fadeOut();
+			}
+		});
+		/* create an axios client to the SQL API */
+            var API_KEY = '9d3d3e19781c35ce76c075e4cfe9d5caa1604ce9',
+                USER_NAME = 'carto-bsc',
+                SQL_CLIENT = axios.create({
+                    method: 'get',
+                    url: 'https://' + USER_NAME + '.carto.com/api/v2/sql?',
+                    params: {
+                        api_key: API_KEY
+                    }
+                });
+				
+			// Articles per journal plot
+            SQL_CLIENT.request({
+                    params: {
+                        q: "SELECT source,SUM(CAST(num_papers AS INT)) FROM results_full_280218_v1 WHERE source IN ('Nucleic Acids Research', 'Oxford Bioinformatics', 'BMC Genomics', 'BMC Bioinformatics', 'PLoS Computational Biology') GROUP BY source"
+                    },
+                })
+                .then(function (response) {
+                    if (response && response.data) {
+                        console.log(response.data.rows[0]['source']);
+						console.log(response.data.rows[0]['sum']);
+						console.log(response.data.rows[1]['source']);
+						console.log(response.data.rows[1]['sum']);
+						console.log(response.data.rows[2]['source']);
+						console.log(response.data.rows[2]['sum']);
+						console.log(response.data.rows[3]['source']);
+						console.log(response.data.rows[3]['sum']);
+						console.log(response.data.rows[4]['source']);
+						console.log(response.data.rows[4]['sum']);
+						options = {};
+						data = {
+							datasets: [{
+								data: [response.data.rows[0]['sum'], response.data.rows[1]['sum'], response.data.rows[2]['sum'], response.data.rows[3]['sum'], response.data.rows[4]['sum']],
+								backgroundColor: [
+                'rgba(255, 99, 132, 1)',
+                'rgba(54, 162, 235, 1)',
+                'rgba(255, 206, 86, 1)',
+                'rgba(75, 192, 192, 1)',
+                'rgba(153, 102, 255, 1)'
+            ]
+							}],
+
+							// These labels appear in the legend and in the tooltips when hovering different arcs
+							labels: [
+								response.data.rows[0]['source'],
+								response.data.rows[1]['source'],
+								response.data.rows[2]['source'],
+								response.data.rows[3]['source'],
+								response.data.rows[4]['source']
+							]
+						};
+						$("#map").css('z-index', 1);
+						$("#histogram").css('z-index', 2);
+						$("#articlesPerJournalChart").css('z-index', 3);
+						var ctx = $("#articlesPerJournalChart");
+						var articlesPerJournalChart = new Chart(ctx,{
+							type: 'pie',
+							data: data,
+							options: {
+							
+                    maintainAspectRatio: false,
+					legend: {
+                position: 'left'
+            },
+                },
+            borderWidth: 1
+						});
+                    }
+                })
+                .catch(function (error) {
+                    console.log(error);
+                });
+				
+				// Articles per year plot
+            SQL_CLIENT.request({
+                    params: {
+                        q: "SELECT year,SUM(CAST(num_papers AS INT)) FROM results_full_280218_v1 WHERE year > 2004 GROUP BY year ORDER by year ASC"
+                    },
+                })
+                .then(function (response) {
+                    if (response && response.data) {
+                        console.log(response.data.rows[0]['year']);
+						console.log(response.data.rows[0]['sum']);
+						console.log(response.data.rows[1]['year']);
+						console.log(response.data.rows[1]['sum']);
+						console.log(response.data.rows[2]['year']);
+						console.log(response.data.rows[2]['sum']);
+						console.log(response.data.rows[3]['year']);
+						console.log(response.data.rows[3]['sum']);
+						console.log(response.data.rows[4]['year']);
+						console.log(response.data.rows[4]['sum']);
+						console.log(response.data.rows[5]['year']);
+						console.log(response.data.rows[5]['sum']);
+						console.log(response.data.rows[6]['year']);
+						console.log(response.data.rows[6]['sum']);
+						console.log(response.data.rows[7]['year']);
+						console.log(response.data.rows[7]['sum']);
+						console.log(response.data.rows[8]['year']);
+						console.log(response.data.rows[8]['sum']);
+						console.log(response.data.rows[9]['year']);
+						console.log(response.data.rows[9]['sum']);
+						console.log(response.data.rows[10]['year']);
+						console.log(response.data.rows[10]['sum']);
+						console.log(response.data.rows[11]['year']);
+						console.log(response.data.rows[11]['sum']);
+						console.log(response.data.rows[12]['year']);
+						console.log(response.data.rows[12]['sum']);
+						options = {};
+						data = {
+							datasets: [{
+								data: [response.data.rows[0]['sum'], 
+								response.data.rows[1]['sum'], 
+								response.data.rows[2]['sum'], 
+								response.data.rows[3]['sum'], 
+								response.data.rows[4]['sum'],
+								response.data.rows[5]['sum'],
+								response.data.rows[6]['sum'],
+								response.data.rows[7]['sum'],
+								response.data.rows[8]['sum'],
+								response.data.rows[9]['sum'],
+								response.data.rows[10]['sum'],
+								response.data.rows[11]['sum'],
+								response.data.rows[12]['sum']],
+								backgroundColor: [
+                'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)',
+				'rgba(255, 99, 132, 1)'
+            ]
+							}],
+
+							// These labels appear in the legend and in the tooltips when hovering different arcs
+							labels: [
+								response.data.rows[0]['year'],
+								response.data.rows[1]['year'],
+								response.data.rows[2]['year'],
+								response.data.rows[3]['year'],
+								response.data.rows[4]['year'],
+								response.data.rows[5]['year'],
+								response.data.rows[6]['year'],
+								response.data.rows[7]['year'],
+								response.data.rows[8]['year'],
+								response.data.rows[9]['year'],
+								response.data.rows[10]['year'],
+								response.data.rows[11]['year'],
+								response.data.rows[12]['year']
+							]
+						};
+						$("#map").css('z-index', 1);
+						$("#histogram").css('z-index', 2);
+						$("#articlesPerYearChart").css('z-index', 3);
+						var ctx = $("#articlesPerYearChart");
+						var articlesPerJournalChart = new Chart(ctx,{
+							type: 'bar',
+							data: data,
+							options: {
+                    maintainAspectRatio: false,
+					legend: {
+            display: false
+         }
+                },
+            borderWidth: 1
+						});
+                    }
+                })
+                .catch(function (error) {
+                    console.log(error);
+                });
+				
+	$('#yearSelector').multiselect({
+			includeSelectAllOption: true,
+			allSelectedText: 'All years selected',
+            onChange: function(option, checked) {
+                
+            },
+            buttonText: function(options) {
+			    if(options.length > 0) {
+					var selected = [];
+                    options.each(function() {
+                        selected.push([$(this).text(), $(this).data('order')]);
+                    });
+ 
+                    selected.sort(function(a, b) {
+                        return a[1] - b[1];
+                    });
+ 
+                    var text = '';
+                    for (var i = 0; i < selected.length; i++) {
+                        text += selected[i][0] + ', ';
+                    }
+					selectedYearsArray = text.substr(0, text.length -2);
+					citiesSource.setQuery(query({cities: 500, year: selectedYearsArray, journal: selectedJournalsArray}))
+					citiesLayer = new carto.layer.Layer(citiesSource, citiesStyle, {
+						featureOverColumns: ['nombre','provincia','localidad','domicilio','codigo_postal','fecha_inscripcion']});
+                    console.log("(" + text.substr(0, text.length -2) + ")");
+				}
+                if (options.length === 0) {
+				console.log('All years selected')
+                    return 'All years';
+                }
+                else if (options.length > 3) {
+                    return options.length + ' years selected';
+                }
+                else {
+                    var selected = [];
+                    options.each(function() {
+                        selected.push([$(this).text(), $(this).data('order')]);
+                    });
+ 
+                    selected.sort(function(a, b) {
+                        return a[1] - b[1];
+                    });
+ 
+                    var text = '';
+                    for (var i = 0; i < selected.length; i++) {
+                        text += selected[i][0] + ', ';
+                    }
+					
+                    return text.substr(0, text.length -2);
+                }
+            }
+        }, 'selectAll');
+		
+		$('#journalsSelector').multiselect({
+			includeSelectAllOption: true,
+			allSelectedText: 'All journals selected',
+            onChange: function(option, checked) {
+                
+            },
+            buttonText: function(options) {
+			    if(options.length > 0) {
+					var selected = [];
+                    options.each(function() {
+                        selected.push([$(this).text(), $(this).data('order')]);
+                    });
+ 
+                    selected.sort(function(a, b) {
+                        return a[1] - b[1];
+                    });
+ 
+                    var text = '';
+                    for (var i = 0; i < selected.length; i++) {
+                        text += "'" + selected[i][0] + "'" + ', ';
+                    }
+					selectedJournalsArray = text.substr(0, text.length -2);
+					citiesSource.setQuery(query({cities: 500, year: selectedYearsArray, journal: selectedJournalsArray}))
+					citiesLayer = new carto.layer.Layer(citiesSource, citiesStyle, {
+						featureOverColumns: ['nombre','provincia','localidad','domicilio','codigo_postal','fecha_inscripcion']});
+                    console.log("(" + text.substr(0, text.length -2) + ")");
+				}
+                if (options.length === 0) {
+				console.log('All journals selected')
+                    return 'All journals';
+                }
+                else if (options.length > 3) {
+                    return options.length + ' journals selected';
+                }
+                else {
+                    var selected = [];
+                    options.each(function() {
+                        selected.push([$(this).text(), $(this).data('order')]);
+                    });
+ 
+                    selected.sort(function(a, b) {
+                        return a[1] - b[1];
+                    });
+ 
+                    var text = '';
+                    for (var i = 0; i < selected.length; i++) {
+                        text += selected[i][0] + ', ';
+                    }
+					
+                    return text.substr(0, text.length -2);
+                }
+            }
+        }, 'selectAll');
+		
+		$('option', $('#journalsSelector')).each(function(index, element) {
+			$(this).removeAttr('selected').prop('selected', true);
+  });
+  $("#journalsSelector").multiselect('refresh');
+  
+		$('option', $('#yearSelector')).each(function(index, element) {
+		if(index < 6) {
+			$(this).removeAttr('selected').prop('selected', false);
+		}
+		if(index > 6) {
+			$(this).removeAttr('selected').prop('selected', true);
+		}
+		if(index > 9) {
+			$(this).removeAttr('selected').prop('selected', false);
+		}
+  });
+  $("#yearSelector").multiselect('refresh');
+ 
+}	
+	
+	);
+	
+	const popup = L.popup({ closeButton: true });
+	
+	function openPopup(featureEvent) {
+        popup.setLatLng(featureEvent.latLng);
+        if (!popup.isOpen()) {
+          let content = '';
+          content += `<div class="popup-container">`;
+          if (featureEvent.data.nombre) {
+            content += `<h4>FUNDACIÓN: ${featureEvent.data.nombre}</h4>`;
+			content += `<br><br>`;
+			content += `<p><b>PROVINCIA:</b> ${featureEvent.data.provincia.toUpperCase()}</p>`;
+			content += `<p><b>LOCALIDAD:</b> ${featureEvent.data.localidad.toUpperCase()}</p>`;
+			content += `<p><b>CÓDIGO POSTAL:</b> ${featureEvent.data.codigo_postal}</p>`;
+			content += `<p><b>DOMICILIO:</b> ${featureEvent.data.domicilio.toUpperCase()}</p>`;
+			content += `<p><b>FECHA DE INSCRIPCIÓN:</b> ${featureEvent.data.fecha_inscripcion}</p>`;
+			content += `<canvas id="bar-chart" width="150" height="100"></canvas>`;
+          }
+          content += `</div>`;
+          popup.setContent(content);
+          popup.openOn(map);
+        }
+      }
+
+      function closePopup(featureEvent) {
+        popup.removeFrom(map);
+      }
+	
+			// add popup
+			citiesLayer.on('featureClicked', openPopup);
+        //citiesLayer.on('featureOut', closePopup);
+        
+  
+        }
+		
+      window.onload = main;
+    </script>
+
+</body>
+</html>
